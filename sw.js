@@ -12,7 +12,7 @@
 // The old cache gets deleted automatically (see the activate event below).
 // Good practice: bump the version number when you make changes.
 // e.g. "budget-app-v1" → "budget-app-v2"
-const CACHE_NAME = "budget-app-v1";
+const CACHE_NAME = "budget-app-v2";
 
 // FILES TO CACHE — every file your app needs to run.
 // Add any new files here if you add them to your project.
