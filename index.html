@@ -1,0 +1,931 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Budget Dashboard</title>
+
+  <!--
+    PWA LINE 1: Link to the manifest.
+    This tells the browser your app has a name, icon, and
+    can be installed. Without this, "Add to Home Screen" won't work.
+  -->
+  <link rel="manifest" href="/manifest.json" />
+
+  <!--
+    PWA LINE 2: Theme colour for the browser chrome on mobile.
+    This colours the status bar on iPhone/Android when the app is open.
+    Match this to the theme_color in your manifest.json.
+  -->
+  <meta name="theme-color" content="#1a1a1a" />
+
+  <!--
+    Apple-specific PWA tags.
+    Safari on iOS doesn't fully respect the manifest yet,
+    so these extra tags are needed for iPhone home screen installs.
+  -->
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black" />
+  <meta name="apple-mobile-web-app-title" content="Budget" />
+  <link rel="apple-touch-icon" href="/icon-192.png" />
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: sans-serif;
+      background-color: #f0f0f0;
+      color: #222;
+      padding: 20px 16px;
+      /* Safe area insets — stops content going under the iPhone notch
+         or home indicator bar at the bottom */
+      padding-top: max(20px, env(safe-area-inset-top));
+      padding-bottom: max(20px, env(safe-area-inset-bottom));
+      padding-left: max(16px, env(safe-area-inset-left));
+      padding-right: max(16px, env(safe-area-inset-right));
+    }
+
+    h1 { font-size: 22px; margin-bottom: 4px; }
+
+    .subtitle { font-size: 13px; color: #999; margin-bottom: 20px; }
+
+    .month-nav {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 20px;
+    }
+
+    .month-nav button {
+      background: white;
+      border: 1px solid #ddd;
+      border-radius: 8px;
+      padding: 6px 14px;
+      font-size: 14px;
+      cursor: pointer;
+      color: #444;
+      /* Larger tap target on mobile */
+      min-height: 44px;
+    }
+
+    .month-nav button:hover { background: #f5f5f5; }
+    .month-nav button:disabled { opacity: 0.35; cursor: default; }
+
+    .month-nav .month-display {
+      font-size: 16px;
+      font-weight: 500;
+      min-width: 160px;
+      text-align: center;
+    }
+
+    .past-badge {
+      font-size: 12px;
+      background: #fff3cd;
+      color: #856404;
+      border: 1px solid #ffc107;
+      border-radius: 20px;
+      padding: 2px 10px;
+    }
+
+    .grid-2 {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin-bottom: 16px;
+    }
+
+    /* Single column on phones */
+    @media (max-width: 600px) {
+      .grid-2 { grid-template-columns: 1fr; }
+    }
+
+    .card {
+      background: white;
+      border-radius: 12px;
+      padding: 20px;
+      border: 1px solid #ddd;
+    }
+
+    .card h2 {
+      font-size: 14px;
+      color: #888;
+      margin-bottom: 16px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .stat-value { font-size: 28px; font-weight: 500; margin-bottom: 2px; }
+    .stat-label { font-size: 13px; color: #999; }
+    .stat-value.good { color: #2a9d5c; }
+    .stat-value.over { color: #cc3333; }
+
+    .progress-track {
+      height: 8px;
+      background: #eee;
+      border-radius: 4px;
+      overflow: hidden;
+      margin: 12px 0 6px;
+    }
+
+    .progress-fill {
+      height: 100%;
+      border-radius: 4px;
+      background: #2a9d5c;
+      transition: width 0.4s ease;
+      width: 0%;
+    }
+
+    .progress-fill.over { background: #cc3333; }
+
+    .progress-labels {
+      display: flex;
+      justify-content: space-between;
+      font-size: 12px;
+      color: #aaa;
+    }
+
+    label {
+      display: block;
+      font-size: 13px;
+      color: #666;
+      margin-bottom: 5px;
+      margin-top: 12px;
+    }
+
+    label:first-of-type { margin-top: 0; }
+
+    input[type="text"],
+    input[type="number"],
+    select {
+      width: 100%;
+      padding: 10px 12px;
+      font-size: 15px;
+      border: 1px solid #ccc;
+      border-radius: 8px;
+      outline: none;
+      background: white;
+      color: #222;
+      /* 44px min height = Apple's recommended tap target size */
+      min-height: 44px;
+    }
+
+    input:focus, select:focus { border-color: #888; }
+
+    .btn-primary {
+      display: block;
+      width: 100%;
+      margin-top: 14px;
+      padding: 11px;
+      font-size: 15px;
+      font-weight: 500;
+      background: #1a1a1a;
+      color: white;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      min-height: 44px;
+    }
+
+    .btn-primary:hover { background: #333; }
+
+    /* Active state for mobile — gives tap feedback */
+    .btn-primary:active { background: #555; transform: scale(0.98); }
+
+    .btn-secondary {
+      display: inline-block;
+      margin-top: 12px;
+      padding: 8px 14px;
+      font-size: 13px;
+      background: #f5f5f5;
+      color: #444;
+      border: 1px solid #ddd;
+      border-radius: 8px;
+      cursor: pointer;
+      min-height: 44px;
+      line-height: 28px;
+    }
+
+    .btn-secondary:hover { background: #eee; }
+
+    .btn-danger {
+      background: none;
+      border: none;
+      color: #cc3333;
+      font-size: 18px;
+      cursor: pointer;
+      padding: 4px 8px;
+      /* Big enough to tap on mobile */
+      min-width: 44px;
+      min-height: 44px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+
+    .bar-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 10px;
+    }
+
+    .bar-label {
+      font-size: 13px;
+      color: #555;
+      width: 130px;
+      flex-shrink: 0;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .bar-track {
+      flex: 1;
+      height: 20px;
+      background: #f0f0f0;
+      border-radius: 4px;
+      overflow: hidden;
+    }
+
+    .bar-fill {
+      height: 100%;
+      border-radius: 4px;
+      transition: width 0.4s ease;
+    }
+
+    .bar-amount {
+      font-size: 13px;
+      font-weight: 500;
+      color: #333;
+      width: 60px;
+      text-align: right;
+      flex-shrink: 0;
+    }
+
+    .expense-list { list-style: none; }
+
+    .expense-item {
+      display: flex;
+      align-items: center;
+      padding: 10px 0;
+      border-bottom: 1px solid #f5f5f5;
+      gap: 10px;
+    }
+
+    .expense-item:last-child { border-bottom: none; }
+
+    .expense-dot {
+      width: 9px;
+      height: 9px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+
+    .expense-name { flex: 1; font-size: 14px; }
+    .expense-meta { font-size: 12px; color: #bbb; }
+
+    .expense-amount {
+      font-size: 14px;
+      font-weight: 500;
+      width: 65px;
+      text-align: right;
+      flex-shrink: 0;
+    }
+
+    .empty-message {
+      text-align: center;
+      color: #ccc;
+      font-size: 14px;
+      padding: 24px 0;
+    }
+
+    .chart-wrap {
+      position: relative;
+      max-width: 220px;
+      margin: 0 auto;
+    }
+
+    .pie-legend {
+      margin-top: 14px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      justify-content: center;
+    }
+
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      font-size: 12px;
+      color: #555;
+    }
+
+    .legend-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+
+    .past-mode .add-form {
+      opacity: 0.4;
+      pointer-events: none;
+    }
+
+    .past-notice {
+      font-size: 13px;
+      color: #856404;
+      background: #fff3cd;
+      border: 1px solid #ffc107;
+      border-radius: 8px;
+      padding: 10px 14px;
+      margin-bottom: 14px;
+      display: none;
+    }
+
+    /* =============================================
+       INSTALL BANNER
+       Shown when the app can be installed (Android/Chrome).
+       iOS shows its own prompt via the apple meta tags above.
+    ============================================= */
+    #install-banner {
+      display: none;
+      background: #1a1a1a;
+      color: white;
+      padding: 12px 16px;
+      border-radius: 10px;
+      margin-bottom: 16px;
+      align-items: center;
+      gap: 12px;
+      font-size: 14px;
+    }
+
+    #install-banner span { flex: 1; }
+
+    #install-banner button {
+      background: white;
+      color: #1a1a1a;
+      border: none;
+      border-radius: 6px;
+      padding: 6px 14px;
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+
+    #install-dismiss {
+      background: none !important;
+      color: #aaa !important;
+      font-size: 18px !important;
+      padding: 0 4px !important;
+    }
+  </style>
+</head>
+
+<body>
+
+  <h1>Budget Dashboard</h1>
+  <p class="subtitle">Personal finance tracker</p>
+
+  <!--
+    INSTALL BANNER
+    Appears automatically on Android/Chrome when the browser
+    decides the app is installable. Hidden on iOS (Safari handles
+    its own install flow via the Share button).
+  -->
+  <div id="install-banner">
+    <span>Install this app on your device</span>
+    <button onclick="installApp()">Install</button>
+    <button id="install-dismiss" onclick="dismissInstall()">✕</button>
+  </div>
+
+  <!-- Month navigator -->
+  <div class="month-nav">
+    <button onclick="changeMonth(-1)">← Prev</button>
+    <span class="month-display" id="month-display">—</span>
+    <button onclick="changeMonth(1)" id="btn-next">Next →</button>
+    <span class="past-badge" id="past-badge" style="display:none;">viewing past month</span>
+  </div>
+
+  <!-- Stat tiles -->
+  <div class="grid-2">
+    <div class="card">
+      <h2>Total spent</h2>
+      <div class="stat-value" id="stat-spent">$0.00</div>
+      <div class="stat-label">this month</div>
+    </div>
+    <div class="card">
+      <h2>Remaining</h2>
+      <div class="stat-value good" id="stat-remaining">—</div>
+      <div class="stat-label" id="stat-remaining-label">set a budget to see this</div>
+    </div>
+  </div>
+
+  <!-- Budget progress -->
+  <div class="card" style="margin-bottom:16px;">
+    <h2>Budget progress</h2>
+    <div style="display:flex; gap:16px; align-items:flex-end; flex-wrap:wrap; margin-bottom:12px;">
+      <div style="flex:1; min-width:160px;">
+        <label for="monthly-budget">Monthly budget ($)</label>
+        <input type="number" id="monthly-budget" placeholder="e.g. 2000" />
+      </div>
+      <button class="btn-primary" style="width:auto; margin-top:0;" onclick="updateBudget()">Set</button>
+    </div>
+    <div class="progress-track">
+      <div class="progress-fill" id="progress-fill"></div>
+    </div>
+    <div class="progress-labels">
+      <span id="progress-spent">$0 spent</span>
+      <span id="progress-budget">No budget set</span>
+    </div>
+  </div>
+
+  <!-- Charts -->
+  <div class="grid-2" style="margin-bottom:16px;">
+    <div class="card">
+      <h2>Spending breakdown</h2>
+      <div class="chart-wrap">
+        <canvas id="pie-chart"></canvas>
+      </div>
+      <div class="pie-legend" id="pie-legend"></div>
+    </div>
+    <div class="card">
+      <h2>By category</h2>
+      <div id="bar-chart"></div>
+    </div>
+  </div>
+
+  <!-- Add form + list -->
+  <div class="grid-2" id="bottom-grid">
+    <div class="card">
+      <h2>Add expense</h2>
+
+      <div class="past-notice" id="past-notice">
+        You're viewing a past month. Switch to the current month to add expenses.
+      </div>
+
+      <div class="add-form">
+        <!--
+          RECEIPT SCANNER PLACEHOLDER
+          When you're ready to add the AI receipt scanner (Phase 3),
+          this button is where it goes. It will pre-fill the fields below.
+        -->
+        <button class="btn-secondary" style="width:100%; margin-top:0; margin-bottom:12px; opacity:0.4;" disabled>
+          📷 Scan receipt — coming soon
+        </button>
+
+        <label for="expense-name">What did you spend on?</label>
+        <input type="text" id="expense-name" placeholder="e.g. Trader Joe's"
+          autocomplete="off" autocorrect="off" />
+
+        <label for="expense-amount">Amount ($)</label>
+        <input type="number" id="expense-amount" placeholder="e.g. 54.20"
+          step="0.01" inputmode="decimal" />
+        <!--
+          inputmode="decimal" shows a number keyboard on iPhone
+          instead of the full keyboard — much easier to type amounts
+        -->
+
+        <label for="expense-category">Category</label>
+        <select id="expense-category">
+          <option value="Food & groceries">Food & groceries</option>
+          <option value="Eating out">Eating out</option>
+          <option value="Transport">Transport</option>
+          <option value="Entertainment">Entertainment</option>
+          <option value="Health">Health</option>
+          <option value="Shopping">Shopping</option>
+          <option value="Subscriptions">Subscriptions</option>
+          <option value="Other">Other</option>
+        </select>
+
+        <button class="btn-primary" onclick="addExpense()">Add expense</button>
+        <button class="btn-secondary" onclick="exportCSV()">Export CSV</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Expenses</h2>
+      <ul class="expense-list" id="expense-list">
+        <li class="empty-message">No expenses yet</li>
+      </ul>
+    </div>
+  </div>
+
+
+  <script>
+
+    // -----------------------------------------------
+    // PWA: SERVICE WORKER REGISTRATION
+    //
+    // This runs once when the page loads. It tells the
+    // browser to install sw.js as a service worker.
+    // The 'in navigator.serviceWorker' check makes sure
+    // we only do this in browsers that support it.
+    // -----------------------------------------------
+    if ("serviceWorker" in navigator) {
+      window.addEventListener("load", function() {
+        navigator.serviceWorker
+          .register("/sw.js")
+          .then(function(reg) {
+            console.log("Service worker registered:", reg.scope);
+          })
+          .catch(function(err) {
+            console.log("Service worker failed:", err);
+          });
+      });
+    }
+
+
+    // -----------------------------------------------
+    // PWA: INSTALL PROMPT
+    //
+    // On Android/Chrome, the browser fires a
+    // 'beforeinstallprompt' event when the app is
+    // installable. We catch it here and show our
+    // custom banner instead of the browser's default.
+    //
+    // On iOS, Safari has its own flow (Share → Add to
+    // Home Screen) so this code doesn't run there.
+    // -----------------------------------------------
+    let deferredInstallPrompt = null;
+
+    window.addEventListener("beforeinstallprompt", function(e) {
+      // Stop the browser showing its own mini-infobar
+      e.preventDefault();
+      // Save the event so we can trigger it later
+      deferredInstallPrompt = e;
+      // Show our banner
+      document.getElementById("install-banner").style.display = "flex";
+    });
+
+    function installApp() {
+      if (!deferredInstallPrompt) return;
+      deferredInstallPrompt.prompt();
+      deferredInstallPrompt.userChoice.then(function(result) {
+        if (result.outcome === "accepted") {
+          document.getElementById("install-banner").style.display = "none";
+        }
+        deferredInstallPrompt = null;
+      });
+    }
+
+    function dismissInstall() {
+      document.getElementById("install-banner").style.display = "none";
+    }
+
+    // Hide the banner once the app is installed
+    window.addEventListener("appinstalled", function() {
+      document.getElementById("install-banner").style.display = "none";
+    });
+
+
+    // -----------------------------------------------
+    // DATA
+    // -----------------------------------------------
+    let expenses      = [];
+    let monthlyBudget = 0;
+
+    const categoryColors = {
+      "Food & groceries": "#2a9d5c",
+      "Eating out":       "#e76f51",
+      "Transport":        "#457b9d",
+      "Entertainment":    "#9b5de5",
+      "Health":           "#f4a261",
+      "Shopping":         "#e63946",
+      "Subscriptions":    "#264653",
+      "Other":            "#888888"
+    };
+
+
+    // -----------------------------------------------
+    // MONTH NAVIGATION
+    // -----------------------------------------------
+    const todayDate  = new Date();
+    const todayYear  = todayDate.getFullYear();
+    const todayMonth = todayDate.getMonth();
+
+    let viewYear  = todayYear;
+    let viewMonth = todayMonth;
+
+    function changeMonth(direction) {
+      viewMonth += direction;
+      if (viewMonth < 0)  { viewMonth = 11; viewYear--; }
+      if (viewMonth > 11) { viewMonth = 0;  viewYear++; }
+      loadFromStorage();
+      renderAll();
+    }
+
+    function isViewingCurrentMonth() {
+      return viewYear === todayYear && viewMonth === todayMonth;
+    }
+
+    function storageKey(year, month) {
+      return "expenses-" + year + "-" + String(month + 1).padStart(2, "0");
+    }
+
+    function budgetKey(year, month) {
+      return "budget-" + year + "-" + String(month + 1).padStart(2, "0");
+    }
+
+
+    // -----------------------------------------------
+    // LOCALSTORAGE
+    // -----------------------------------------------
+    function saveToStorage() {
+      localStorage.setItem(storageKey(viewYear, viewMonth), JSON.stringify(expenses));
+      localStorage.setItem(budgetKey(viewYear, viewMonth), monthlyBudget);
+    }
+
+    function loadFromStorage() {
+      const savedExpenses = localStorage.getItem(storageKey(viewYear, viewMonth));
+      expenses = savedExpenses ? JSON.parse(savedExpenses) : [];
+
+      const savedBudget = localStorage.getItem(budgetKey(viewYear, viewMonth));
+      monthlyBudget = savedBudget ? Number(savedBudget) : 0;
+
+      document.getElementById("monthly-budget").value = monthlyBudget > 0 ? monthlyBudget : "";
+    }
+
+
+    // -----------------------------------------------
+    // CHART SETUP
+    // -----------------------------------------------
+    const pieChart = new Chart(document.getElementById("pie-chart"), {
+      type: "doughnut",
+      data: {
+        labels: [],
+        datasets: [{
+          data: [],
+          backgroundColor: [],
+          borderWidth: 2,
+          borderColor: "#fff"
+        }]
+      },
+      options: {
+        responsive: true,
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            callbacks: {
+              label: function(context) {
+                const value = context.parsed;
+                const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                const pct   = ((value / total) * 100).toFixed(1);
+                return " $" + value.toFixed(2) + " (" + pct + "%)";
+              }
+            }
+          }
+        }
+      }
+    });
+
+
+    // -----------------------------------------------
+    // ADD EXPENSE
+    // -----------------------------------------------
+    function addExpense() {
+      const name     = document.getElementById("expense-name").value.trim();
+      const amount   = Number(document.getElementById("expense-amount").value);
+      const category = document.getElementById("expense-category").value;
+
+      if (!name)                        { alert("Please enter a name."); return; }
+      if (amount <= 0 || isNaN(amount)) { alert("Please enter a valid amount."); return; }
+
+      expenses.push({
+        id:       Date.now(),
+        name:     name,
+        amount:   amount,
+        category: category,
+        date:     new Date().toISOString()
+      });
+
+      document.getElementById("expense-name").value   = "";
+      document.getElementById("expense-amount").value = "";
+
+      saveToStorage();
+      renderAll();
+    }
+
+    // Allow pressing Enter in the amount field to submit
+    document.getElementById("expense-amount").addEventListener("keydown", function(e) {
+      if (e.key === "Enter") addExpense();
+    });
+
+
+    // -----------------------------------------------
+    // DELETE EXPENSE
+    // -----------------------------------------------
+    function deleteExpense(id) {
+      expenses = expenses.filter(function(e) { return e.id !== id; });
+      saveToStorage();
+      renderAll();
+    }
+
+
+    // -----------------------------------------------
+    // UPDATE BUDGET
+    // -----------------------------------------------
+    function updateBudget() {
+      const input = Number(document.getElementById("monthly-budget").value);
+      if (input <= 0) { alert("Please enter a budget greater than zero."); return; }
+      monthlyBudget = input;
+      saveToStorage();
+      renderAll();
+    }
+
+
+    // -----------------------------------------------
+    // FORMAT DATE
+    // -----------------------------------------------
+    function formatDate(isoString) {
+      if (!isoString) return "";
+      return new Date(isoString).toLocaleDateString("en-US", { month: "short", day: "numeric" });
+    }
+
+
+    // -----------------------------------------------
+    // RENDER ALL
+    // -----------------------------------------------
+    function renderAll() {
+      renderMonthNav();
+      renderStats();
+      renderPieChart();
+      renderBarChart();
+      renderExpenseList();
+      renderPastModeUI();
+    }
+
+    function renderMonthNav() {
+      const monthName = new Date(viewYear, viewMonth).toLocaleDateString("en-US", {
+        month: "long", year: "numeric"
+      });
+      document.getElementById("month-display").textContent = monthName;
+      document.getElementById("btn-next").disabled = isViewingCurrentMonth();
+      document.getElementById("past-badge").style.display =
+        isViewingCurrentMonth() ? "none" : "inline-block";
+    }
+
+    function renderPastModeUI() {
+      const grid   = document.getElementById("bottom-grid");
+      const notice = document.getElementById("past-notice");
+      if (isViewingCurrentMonth()) {
+        grid.classList.remove("past-mode");
+        notice.style.display = "none";
+      } else {
+        grid.classList.add("past-mode");
+        notice.style.display = "block";
+      }
+    }
+
+    function renderStats() {
+      const total     = expenses.reduce(function(sum, e) { return sum + e.amount; }, 0);
+      const remaining = document.getElementById("stat-remaining");
+      const fill      = document.getElementById("progress-fill");
+
+      document.getElementById("stat-spent").textContent = "$" + total.toFixed(2);
+
+      if (monthlyBudget > 0) {
+        const left = monthlyBudget - total;
+        const pct  = Math.min((total / monthlyBudget) * 100, 100);
+
+        remaining.textContent = (left >= 0 ? "$" : "-$") + Math.abs(left).toFixed(2);
+        remaining.className   = "stat-value " + (left >= 0 ? "good" : "over");
+
+        document.getElementById("stat-remaining-label").textContent =
+          left >= 0 ? "remaining" : "over budget";
+
+        fill.style.width = pct + "%";
+        fill.className   = "progress-fill" + (left < 0 ? " over" : "");
+
+        document.getElementById("progress-spent").textContent  = "$" + total.toFixed(2) + " spent";
+        document.getElementById("progress-budget").textContent = "$" + monthlyBudget.toFixed(2) + " budget";
+      } else {
+        remaining.textContent = "—";
+        remaining.className   = "stat-value";
+        fill.style.width      = "0%";
+        document.getElementById("progress-budget").textContent = "No budget set";
+        document.getElementById("progress-spent").textContent  = "$" + total.toFixed(2) + " spent";
+      }
+    }
+
+    function renderPieChart() {
+      const totals = buildCategoryTotals();
+      const labels = Object.keys(totals);
+      const values = labels.map(function(cat) { return totals[cat]; });
+      const colors = labels.map(function(cat) { return categoryColors[cat] || "#888"; });
+
+      pieChart.data.labels                       = labels;
+      pieChart.data.datasets[0].data            = values;
+      pieChart.data.datasets[0].backgroundColor = colors;
+      pieChart.update();
+
+      const legend = document.getElementById("pie-legend");
+      if (labels.length === 0) {
+        legend.innerHTML = '<span style="font-size:13px;color:#ccc;">No expenses this month</span>';
+        return;
+      }
+      legend.innerHTML = labels.map(function(cat) {
+        const color = categoryColors[cat] || "#888";
+        return `<div class="legend-item">
+          <div class="legend-dot" style="background:${color}"></div>
+          <span>${cat}</span>
+        </div>`;
+      }).join("");
+    }
+
+    function renderBarChart() {
+      const container  = document.getElementById("bar-chart");
+      const totals     = buildCategoryTotals();
+      const categories = Object.keys(totals);
+
+      if (categories.length === 0) {
+        container.innerHTML = '<p class="empty-message">No expenses this month</p>';
+        return;
+      }
+
+      const max = Math.max(...Object.values(totals));
+      container.innerHTML = categories.map(function(cat) {
+        const amount = totals[cat];
+        const width  = (amount / max) * 100;
+        const color  = categoryColors[cat] || "#888";
+        return `<div class="bar-row">
+          <div class="bar-label">${cat}</div>
+          <div class="bar-track">
+            <div class="bar-fill" style="width:${width}%; background:${color};"></div>
+          </div>
+          <div class="bar-amount">$${amount.toFixed(0)}</div>
+        </div>`;
+      }).join("");
+    }
+
+    function renderExpenseList() {
+      const list = document.getElementById("expense-list");
+
+      if (expenses.length === 0) {
+        list.innerHTML = '<li class="empty-message">No expenses this month</li>';
+        return;
+      }
+
+      list.innerHTML = expenses.slice().reverse().map(function(expense) {
+        const color     = categoryColors[expense.category] || "#888";
+        const deleteBtn = isViewingCurrentMonth()
+          ? `<button class="btn-danger" onclick="deleteExpense(${expense.id})">✕</button>`
+          : "";
+        return `<li class="expense-item">
+          <div class="expense-dot" style="background:${color}"></div>
+          <div class="expense-name">
+            ${expense.name}
+            <div class="expense-meta">${expense.category} · ${formatDate(expense.date)}</div>
+          </div>
+          <div class="expense-amount">$${expense.amount.toFixed(2)}</div>
+          ${deleteBtn}
+        </li>`;
+      }).join("");
+    }
+
+    function buildCategoryTotals() {
+      const totals = {};
+      expenses.forEach(function(expense) {
+        if (!totals[expense.category]) totals[expense.category] = 0;
+        totals[expense.category] += expense.amount;
+      });
+      return totals;
+    }
+
+    function exportCSV() {
+      if (expenses.length === 0) { alert("No expenses to export."); return; }
+
+      const monthLabel = new Date(viewYear, viewMonth).toLocaleDateString("en-US", {
+        month: "long", year: "numeric"
+      });
+
+      let csv = "Date,Name,Category,Amount\n";
+      expenses.forEach(function(e) {
+        const dateStr = e.date ? new Date(e.date).toLocaleDateString("en-US") : "";
+        csv += `${dateStr},"${e.name}",${e.category},$${e.amount.toFixed(2)}\n`;
+      });
+
+      const blob = new Blob([csv], { type: "text/csv" });
+      const url  = URL.createObjectURL(blob);
+      const a    = document.createElement("a");
+      a.href     = url;
+      a.download = "expenses-" + monthLabel.replace(" ", "-") + ".csv";
+      a.click();
+      URL.revokeObjectURL(url);
+    }
+
+
+    // -----------------------------------------------
+    // INIT
+    // -----------------------------------------------
+    loadFromStorage();
+    renderAll();
+
+  </script>
+</body>
+</html>
