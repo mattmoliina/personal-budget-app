@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Budget Dashboard</title>
+  <title>Monthly Tracking | Expenses</title>
 
   <!--
     PWA LINE 1: Link to the manifest.
@@ -35,9 +35,9 @@
     * { box-sizing: border-box; margin: 0; padding: 0; }
 
     body {
-      font-family: sans-serif;
-      background-color: #f0f0f0;
-      color: #222;
+      font-family: IBM Plex Sans, serif;
+      background-color: #33415c;
+      color: #FFFF;
       padding: 20px 16px;
       /* Safe area insets — stops content going under the iPhone notch
          or home indicator bar at the bottom */
@@ -47,20 +47,21 @@
       padding-right: max(16px, env(safe-area-inset-right));
     }
 
-    h1 { font-size: 22px; margin-bottom: 4px; }
+    h1 { font-size: 40px; margin-bottom: 4px; text-align: center;}
 
     .subtitle { font-size: 13px; color: #999; margin-bottom: 20px; }
 
     .month-nav {
       display: flex;
       align-items: center;
-      gap: 12px;
+      gap: 20px;
       margin-bottom: 20px;
+      justify-content: center;
     }
 
     .month-nav button {
       background: white;
-      border: 1px solid #ddd;
+      border: 2px solid #023e7d;
       border-radius: 8px;
       padding: 6px 14px;
       font-size: 14px;
@@ -74,7 +75,7 @@
     .month-nav button:disabled { opacity: 0.35; cursor: default; }
 
     .month-nav .month-display {
-      font-size: 16px;
+      font-size: 25px;
       font-weight: 500;
       min-width: 160px;
       text-align: center;
@@ -102,22 +103,22 @@
     }
 
     .card {
-      background: white;
+      background: #f7f9f9;
       border-radius: 12px;
       padding: 20px;
-      border: 1px solid #ddd;
+      border: 2.5px solid #001845;
     }
 
     .card h2 {
-      font-size: 14px;
-      color: #888;
+      font-size: 22px;
+      color: black;
       margin-bottom: 16px;
       text-transform: uppercase;
       letter-spacing: 0.05em;
     }
 
-    .stat-value { font-size: 28px; font-weight: 500; margin-bottom: 2px; }
-    .stat-label { font-size: 13px; color: #999; }
+    .stat-value { font-size: 35px; font-weight: 800; margin-bottom: 2px; color: black;}
+    .stat-label { font-size: 16px; color: black; }
     .stat-value.good { color: #2a9d5c; }
     .stat-value.over { color: #cc3333; }
 
@@ -389,8 +390,8 @@
 
 <body>
 
-  <h1>Budget Dashboard</h1>
-  <p class="subtitle">Personal finance tracker</p>
+  <h1>MO-nthly Expenses</h1>
+  <p class="subtitle"></p>
 
   <!--
     INSTALL BANNER
@@ -476,7 +477,7 @@
           this button is where it goes. It will pre-fill the fields below.
         -->
         <button class="btn-secondary" style="width:100%; margin-top:0; margin-bottom:12px; opacity:0.4;" disabled>
-          📷 Scan receipt — coming soon
+          Scan receipt — coming soon
         </button>
 
         <label for="expense-name">What did you spend on?</label>
@@ -493,14 +494,15 @@
 
         <label for="expense-category">Category</label>
         <select id="expense-category">
-          <option value="Food & groceries">Food & groceries</option>
-          <option value="Eating out">Eating out</option>
-          <option value="Transport">Transport</option>
+          <option value="Groceries">Groceries</option>
+          <option value="Dining Out">Dining out</option>
+          <option value="Gas">Gas</option>
+          <option value="Alcohol">Alcohol</option>
           <option value="Entertainment">Entertainment</option>
-          <option value="Health">Health</option>
-          <option value="Shopping">Shopping</option>
+          <option value="Hobbies">Hobbies</option>
+          <option value="Clothing">Clothing</option>
           <option value="Subscriptions">Subscriptions</option>
-          <option value="Other">Other</option>
+          <option value="Non-essential">Non-essential</option>
         </select>
 
         <button class="btn-primary" onclick="addExpense()">Add expense</button>
@@ -591,14 +593,15 @@
     let monthlyBudget = 0;
 
     const categoryColors = {
-      "Food & groceries": "#2a9d5c",
-      "Eating out":       "#e76f51",
-      "Transport":        "#457b9d",
-      "Entertainment":    "#9b5de5",
-      "Health":           "#f4a261",
-      "Shopping":         "#e63946",
-      "Subscriptions":    "#264653",
-      "Other":            "#888888"
+      "Groceries":      "#008000",
+      "Dining Out":     "#800080",
+      "Gas":            "#000000",
+      "Alcohol":        "#ff6b6b",
+      "Entertainment":  "#000080",
+      "Hobbies":        "#800000",
+      "Clothing":       "#ffa500",
+      "Subscriptions":  "#ff0000",
+      "Non-Essential": "#c0c0c0"
     };
 
 
