@@ -1,5 +1,5 @@
 # Budget Dashboard — PWA
-
+Used for personal monthly expense tracking with API later, created with claude code.
 ## Files in this project
 
 | File | What it does |
